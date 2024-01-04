@@ -1,55 +1,34 @@
 //Create web server
-var express = require('express');
-var app = express();
-var bodyParser = require('body-parser');
-var fs = require('fs');
-var request = require('request');
-var cheerio = require('cheerio');
-var async = require('async');
-var mongoose = require('mongoose');
+const express = require('express');
+const router = express.Router();
+const { Comment } = require("../models/Comment");
 
-// Connect to db
-mongoose.connect('mongodb://localhost:27017/Comment');
+//=================================
+//             Comment
+//=================================
 
-var Schema = mongoose.Schema;
+router.post('/saveComment', (req, res) => {
+    const comment = new Comment(req.body)
+    comment.save((err, comment) => {
+        if(err) return res.json({success:false, err})
 
-// Define a schema
-var commentSchema = new Schema({
-    name: String,
-    comment: String
-});
+        //save comment data to Comment Collection
+        Comment.find({'_id': comment._id})
+        .populate('writer')
+        .exec((err, result) => {
+            if(err) return res.json({success:false, err})
+            return res.status(200).json({success:true, result})
+        })
+    })
+})
 
-// Compile model from schema
-var Comment = mongoose.model('Comment', commentSchema);
+router.post('/getComments', (req, res) => {
+    Comment.find({'postId': req.body.movieId})
+    .populate('writer')
+    .exec((err, comments) => {
+        if(err) return res.status(400).send(err)
+        res.status(200).json({success:true, comments})
+    })
+})
 
-// parse application/x-www-form-urlencoded
-app.use(bodyParser.urlencoded({
-    extended: false
-}))
-
-// parse application/json
-app.use(bodyParser.json())
-
-app.post('/postcomment', function(req, res) {
-    var comment = new Comment({
-        name: req.body.name,
-        comment: req.body.comment
-    });
-
-    comment.save(function(err) {
-        if (err) throw err;
-        console.log('Comment saved successfully!');
-        res.send('Comment saved successfully!');
-    });
-});
-
-app.get('/getcomment', function(req, res) {
-    Comment.find({}, function(err, comments) {
-        if (err) throw err;
-        res.send(comments);
-    });
-});
-
-app.listen('8081')
-console.log('Magic happens on port 8081');
-exports = module.exports = app;
+module.exports = router;
